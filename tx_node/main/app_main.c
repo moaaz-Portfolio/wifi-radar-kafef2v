@@ -31,6 +31,10 @@
 #define AP_SSID       "WiFi-Radar-Net"
 #define AP_PASSWORD   "12345678"
 #define AP_CLIENTS    4
+#ifndef CONFIG_RADAR_AP_CHANNEL
+/* Safe default for builds where the optional project setting is unavailable. */
+#define CONFIG_RADAR_AP_CHANNEL 1
+#endif
 #define AP_CHANNEL    CONFIG_RADAR_AP_CHANNEL
 #define UDP_BROADCAST "192.168.4.255"
 #define UDP_PORT      3333
