@@ -159,7 +159,7 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddStringToObject(o, "mac", macs);
     cJSON_AddStringToObject(o, "ip", wifi_mgr_ip());
     cJSON_AddStringToObject(o, "hostname", c->hostname);
-    cJSON_AddNumberToObject(o, "role", c->role);
+    cJSON_AddNumberToObject(o, "role", c->dedicated_mode ? 2 : c->role);
     cJSON_AddNumberToObject(o, "uptime", (double)(esp_timer_get_time() / 1000000LL));
     cJSON_AddNumberToObject(o, "heap", (double)esp_get_free_heap_size());
 
@@ -178,7 +178,24 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(o, "train_status", sn.train_status);
     cJSON_AddBoolToObject(o, "train_valid", sn.train_valid);
     cJSON_AddBoolToObject(o, "mqtt", notify_mqtt_connected());
-    cJSON_AddNumberToObject(o, "csi_sent", csi_stream_sent());
+    csi_stream_stats_t csi_stats = {0};
+    csi_stream_get_stats(&csi_stats);
+    cJSON_AddBoolToObject(o, "dedicated_mode", c->dedicated_mode);
+    cJSON_AddNumberToObject(o, "wifi_channel_hint", c->wifi_channel);
+    cJSON_AddNumberToObject(o, "wifi_channel", wifi_mgr_channel());
+    cJSON_AddNumberToObject(o, "csi_rx", csi_stats.csi_rx);
+    cJSON_AddNumberToObject(o, "csi_sent", csi_stats.csi_sent);
+    cJSON_AddNumberToObject(o, "csi_send_errors", csi_stats.csi_send_errors);
+    cJSON_AddNumberToObject(o, "csi_queue_drops", csi_stats.csi_queue_drops);
+    cJSON_AddNumberToObject(o, "csi_reject_mac", csi_stats.csi_reject_mac);
+    cJSON_AddNumberToObject(o, "csi_reject_len", csi_stats.csi_reject_len);
+    cJSON_AddNumberToObject(o, "csi_reject_rssi", csi_stats.csi_reject_rssi);
+    cJSON_AddNumberToObject(o, "csi_spike_holds", csi_stats.csi_spike_holds);
+    cJSON_AddNumberToObject(o, "heartbeat_rx", csi_stats.heartbeat_rx);
+    cJSON_AddNumberToObject(o, "heartbeat_lost", csi_stats.heartbeat_lost);
+    cJSON_AddNumberToObject(o, "heartbeat_interval_us", csi_stats.heartbeat_interval_us);
+    cJSON_AddNumberToObject(o, "heartbeat_jitter_avg_us", csi_stats.heartbeat_jitter_avg_us);
+    cJSON_AddNumberToObject(o, "heartbeat_jitter_max_us", csi_stats.heartbeat_jitter_max_us);
     cJSON_AddBoolToObject(o, "door_enabled", door.enabled);
     cJSON_AddBoolToObject(o, "door_sensor_ok", door.sensor_ok);
     cJSON_AddBoolToObject(o, "door_valid", door.distance_valid);
@@ -214,7 +231,9 @@ static esp_err_t config_post_handler(httpd_req_t *req)
 
     bool reboot = old.role != c->role || old.ping_hz != c->ping_hz ||
                   strcmp(old.pair_mac, c->pair_mac) != 0 || strcmp(old.stream_host, c->stream_host) != 0 ||
-                  old.stream_port != c->stream_port || strcmp(old.hostname, c->hostname) != 0;
+                  old.stream_port != c->stream_port || strcmp(old.hostname, c->hostname) != 0 ||
+                  old.dedicated_mode != c->dedicated_mode ||
+                  old.wifi_channel != c->wifi_channel;
 
     cJSON *o = cJSON_CreateObject();
     cJSON_AddBoolToObject(o, "ok", true);
@@ -255,6 +274,8 @@ static esp_err_t wifi_post_handler(httpd_req_t *req)
     settings_t *c = settings_get();
     strlcpy(c->wifi_ssid, ssid->valuestring, sizeof(c->wifi_ssid));
     strlcpy(c->wifi_pass, cJSON_IsString(pass) ? pass->valuestring : "", sizeof(c->wifi_pass));
+    /* Saving a router credential explicitly selects router mode. */
+    c->dedicated_mode = false;
     /* optional extras sent by the setup page */
     settings_apply_json(c, j, false);
     cJSON_Delete(j);

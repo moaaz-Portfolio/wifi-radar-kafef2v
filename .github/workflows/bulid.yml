@@ -1,8 +1,8 @@
-name: Build & publish installer
+name: Build WiFi Radar TX + RX and publish ESP Web Tools
 
 on:
   push:
-    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -11,51 +11,100 @@ permissions:
   id-token: write
 
 concurrency:
-  group: wifi-radar-pages-v2
+  group: wifi-radar-dual-firmware
   cancel-in-progress: true
 
 jobs:
   build:
+    name: Build Analyzer RX and Transmitter TX
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Build firmware for ESP32-S3 with Espressif CI
+      - name: Build Analyzer RX firmware (ESP32-S3)
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5
+          esp_idf_version: v5.5.6
           target: esp32s3
           path: .
-          command: idf.py set-target esp32s3 && idf.py build && idf.py merge-bin -o merged.bin && test -s build/merged.bin && test -s build/esp32s3-wifi-radar.bin
+          command: idf.py set-target esp32s3 && idf.py build
 
-      - name: Collect firmware files
+      - name: Build dedicated Transmitter TX firmware (ESP32-S3)
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.6
+          target: esp32s3
+          path: tx_node
+          command: idf.py set-target esp32s3 && idf.py build
+
+      - name: Install esptool 4.x
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "esptool>=4.8,<5"
+
+      - name: Merge complete first-flash images
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p docs/firmware
-          cp build/merged.bin docs/firmware/radar-s3-merged.bin
-          cp build/esp32s3-wifi-radar.bin docs/firmware/esp32s3-wifi-radar.bin
-          ls -lh docs/firmware
 
-      - name: Keep firmware files as artifact
+          test -s build/bootloader/bootloader.bin
+          test -s build/partition_table/partition-table.bin
+          test -s build/esp32s3-wifi-radar.bin
+
+          test -s tx_node/build/bootloader/bootloader.bin
+          test -s tx_node/build/partition_table/partition-table.bin
+          test -s tx_node/build/wifi-radar-tx-node.bin
+
+          # esptool 4.x syntax; partition table 0xA000, app 0x20000.
+          python -m esptool --chip esp32s3 merge_bin \
+            -o docs/firmware/analyzer_rx_merged.bin \
+            --flash_mode dio --flash_size 4MB --flash_freq 40m \
+            0x0 build/bootloader/bootloader.bin \
+            0xA000 build/partition_table/partition-table.bin \
+            0x20000 build/esp32s3-wifi-radar.bin
+
+          python -m esptool --chip esp32s3 merge_bin \
+            -o docs/firmware/transmitter_tx_merged.bin \
+            --flash_mode dio --flash_size 4MB --flash_freq 40m \
+            0x0 tx_node/build/bootloader/bootloader.bin \
+            0xA000 tx_node/build/partition_table/partition-table.bin \
+            0x20000 tx_node/build/wifi-radar-tx-node.bin
+
+          # Compatibility filename retained for previous analyzer install links.
+          cp docs/firmware/analyzer_rx_merged.bin docs/firmware/radar-s3-merged.bin
+          cp build/esp32s3-wifi-radar.bin docs/firmware/esp32s3-wifi-radar.bin
+
+          ls -lh docs/firmware/*.bin
+
+      - name: Upload firmware binaries
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
-          path: docs/firmware/*.bin
+          name: wifi-radar-dual-firmware
+          path: |
+            docs/firmware/analyzer_rx_merged.bin
+            docs/firmware/transmitter_tx_merged.bin
+            docs/firmware/esp32s3-wifi-radar.bin
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Prepare Pages
+      - name: Prepare GitHub Pages installer
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
   deploy:
+    name: Deploy ESP Web Tools installer
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - id: deployment
+      - name: Deploy Pages
+        id: deployment
         uses: actions/deploy-pages@v4

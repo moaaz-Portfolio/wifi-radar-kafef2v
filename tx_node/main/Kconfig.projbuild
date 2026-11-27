@@ -1,0 +1,12 @@
+menu "WiFi Radar TX configuration"
+
+config RADAR_AP_CHANNEL
+    int "SoftAP channel (2.4 GHz)"
+    range 1 13
+    default 1
+    help
+        Channel used by the dedicated TX SoftAP. Use a matching channel
+        plan on the Analyzer if a future build pins the station scan channel.
+        Common non-overlapping choices are 1, 6 and 11.
+
+endmenu

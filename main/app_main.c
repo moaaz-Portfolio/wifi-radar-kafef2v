@@ -33,7 +33,10 @@ void app_reboot_later(uint32_t ms)
 
 static void start_mdns(const settings_t *c)
 {
-    if (mdns_init() != ESP_OK) { ESP_LOGW(TAG, "mdns init failed"); return; }
+    if (mdns_init() != ESP_OK) {
+        ESP_LOGW(TAG, "mdns init failed");
+        return;
+    }
     mdns_hostname_set(c->hostname);
     mdns_instance_name_set(FW_NAME);
     mdns_service_add(FW_NAME, "_http", "_tcp", 80, NULL, 0);
@@ -42,31 +45,55 @@ static void start_mdns(const settings_t *c)
 
 void app_main(void)
 {
-    esp_err_t e = nvs_flash_init();
-    if (e == ESP_ERR_NVS_NO_FREE_PAGES || e == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES ||
+        err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
-        e = nvs_flash_init();
+        err = nvs_flash_init();
     }
-    ESP_ERROR_CHECK(e);
+    ESP_ERROR_CHECK(err);
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    settings_load();
-    settings_t *c = settings_get();
+    ESP_ERROR_CHECK(settings_load());
+    settings_t *cfg = settings_get();
 
-    outputs_init(c);
+    /*
+     * Dedicated mode always uses the CSI Analyzer role.
+     * This is RAM-only: switching back to router mode restores the user's saved role.
+     * Do not clear stream_host; it may intentionally point at a laptop address.
+     */
+    if (cfg->dedicated_mode && cfg->stream_port == 0) {
+        cfg->stream_port = 5005;
+    }
 
-    netmode_t mode = wifi_mgr_start();
+    outputs_init(cfg);
+
+    const netmode_t network_mode = wifi_mgr_start();
+
+    /* Door sensing stays active in both dedicated and router modes. */
     ESP_ERROR_CHECK(door_sensor_start());
-    web_server_start();
+    ESP_ERROR_CHECK(web_server_start());
 
-    if (mode == NETMODE_STA) {
-        start_mdns(c);
-        if (c->role == 1) sender_start();
-        else if (c->role == 2) csi_stream_start();
-        else sensing_start();
-        if (c->role != 2) notify_start();
+    if (network_mode == NETMODE_STA) {
+        start_mdns(cfg);
+
+        if (cfg->dedicated_mode) {
+            ESP_ERROR_CHECK(csi_stream_start());
+        } else {
+            if (cfg->role == 1) {
+                ESP_ERROR_CHECK(sender_start());
+            } else if (cfg->role == 2) {
+                ESP_ERROR_CHECK(csi_stream_start());
+            } else {
+                ESP_ERROR_CHECK(sensing_start());
+            }
+            if (cfg->role != 2) notify_start();
+        }
+
+        ESP_LOGI(TAG, "application started: dedicated=%s role=%u",
+                 cfg->dedicated_mode ? "yes" : "no", cfg->role);
     } else {
-        ESP_LOGW(TAG, "setup mode: connect to the 'S3-Radar-Setup' Wi-Fi");
+        ESP_LOGW(TAG, "setup mode: connect to S3-Radar-Setup and open http://192.168.4.1");
     }
 }

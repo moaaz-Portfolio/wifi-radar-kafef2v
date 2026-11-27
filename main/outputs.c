@@ -129,13 +129,19 @@ static void outputs_task(void *arg)
         int64_t now_us = esp_timer_get_time();
         uint32_t now_ms = (uint32_t)(now_us / 1000);
 
-        /* BOOT button: hold 3s to forget Wi-Fi */
+        /* BOOT hold 3s: toggle dedicated TX/RX mode <-> saved home router. */
         if (gpio_get_level(BOOT_BUTTON_GPIO) == 0) {
             held_ms += TICK_MS;
             if (held_ms >= BUTTON_HOLD_MS) {
-                ESP_LOGW(TAG, "BOOT held: forgetting Wi-Fi");
-                settings_wifi_reset();
-                app_reboot_later(300);
+                settings_t *cfg = settings_get();
+                cfg->dedicated_mode = !cfg->dedicated_mode;
+                if (settings_save() == ESP_OK) {
+                    ESP_LOGW(TAG, "BOOT held: switching network mode to %s",
+                             cfg->dedicated_mode ? "dedicated TX/RX" : "home router");
+                    app_reboot_later(300);
+                } else {
+                    ESP_LOGE(TAG, "could not save network mode");
+                }
                 held_ms = -100000;
             }
         } else {

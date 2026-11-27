@@ -94,7 +94,11 @@ progress{width:100%;height:10px;margin-top:10px}
     <div><label>jitter_min</label><input type="number" step="0.001" data-k="jitter_min" data-t="f"></div>
     <div><label>filter (ms)</label><input type="number" step="10" data-k="filter_ms" data-t="n"></div>
     <div><label data-i="ping"></label><input type="number" min="5" max="200" data-k="ping_hz" data-t="n"></div>
+    <div><label>CSI EMA alpha</label><input type="number" min="0.01" max="1" step="0.01" data-k="csi_ema_alpha" data-t="f"></div>
+    <div><label>Single-frame spike threshold</label><input type="number" min="0" max="127" data-k="csi_jump_threshold" data-t="n"></div>
+    <div><label>CSI micro-deadband (0–2)</label><input type="number" min="0" max="2" step="0.1" data-k="csi_deadband" data-t="f"></div>
    </div>
+   <p class="hint">Default deadband 0.5 is below one uint8 amplitude unit. Set it to zero for maximum sensitivity; do not use a wide deadband for low-rate respiration experiments.</p>
   </details>
   <button class="p" data-save="p_det" data-i="save"></button>
 
@@ -142,6 +146,11 @@ progress{width:100%;height:10px;margin-top:10px}
  <!-- NETWORK -->
  <div class="card panel" id="p_net">
   <h3 data-i="mode"></h3>
+  <div class="chk"><input type="checkbox" id="dedicated_mode" data-k="dedicated_mode" data-t="b"><label for="dedicated_mode">Dedicated TX/RX link (default) / وضع الشريحتين المستقل</label></div>
+  <div class="g">
+   <div><label>Expected TX channel</label><select data-k="wifi_channel" data-t="n"><option value="1">1 — 2412 MHz</option><option value="6">6 — 2437 MHz</option><option value="11">11 — 2462 MHz</option></select></div>
+  </div>
+  <p class="hint">Default TX channel is 1. Keep this RX channel setting matched to tx_node Kconfig if changing the TX build channel.</p>
   <div class="g">
    <div><label data-i="role"></label>
     <select data-k="role" data-t="n"><option value="0" data-i="role0"></option><option value="1" data-i="role1"></option><option value="2" data-i="role2"></option></select></div>
@@ -272,7 +281,7 @@ function render(s){
  $('state').textContent=stream?'📡':(sender?'📤':(s.motion?t('moving'):t('still')));
  const p=$('pres');p.style.display=sender?'none':'';p.textContent=s.presence?t('pres_y'):t('pres_n');p.className='chip'+(s.presence?' ok':'');
  $('warm').style.display=(!sender&&s.running&&!s.ready)?'':'none';
- $('net').textContent=(s.mode=='setup'?'⚙ ':'')+(s.hostname||'')+'.local';
+ $('net').textContent=(s.mode=='setup'?'⚙ ':'')+(s.dedicated_mode?'TX/RX · ':'Router · ')+(s.hostname||'')+'.local';
  $('net').className='chip'+(s.mq?' ok':'');
  $('m_ip').textContent=s.ip||'';
  $('m_rssi').textContent=s.rssi!=null?s.rssi+' dBm':'';
@@ -282,7 +291,14 @@ function render(s){
     (s.door_valid?' · '+t('door_distance')+' '+s.door_distance_cm+' cm':'')+
     (s.buzzer_active?' · '+t('buzzer_active'):'');
   $('my_mac').textContent=s.mac||'';
- $('kv').innerHTML=[['k_fw',s.fw],['k_ip',s.ip],['k_mac',s.mac],['k_ssid',s.ssid||'-'],['k_heap',Math.round((s.heap||0)/1024)+' KB']]
+ $('kv').innerHTML=[['k_fw',s.fw],['k_ip',s.ip],['k_mac',s.mac],['k_ssid',s.ssid||'-'],
+  ['Dedicated mode',s.dedicated_mode?'yes':'no'],['Wi-Fi channel',s.wifi_channel||'-'],
+  ['CSI RX / TX',String(s.csi_rx||0)+' / '+String(s.csi_sent||0)],
+  ['CSI queue drops',s.csi_queue_drops||0],
+  ['Reject MAC / len / RSSI',String(s.csi_reject_mac||0)+' / '+String(s.csi_reject_len||0)+' / '+String(s.csi_reject_rssi||0)],
+  ['Heartbeat RX / lost',String(s.heartbeat_rx||0)+' / '+String(s.heartbeat_lost||0)],
+  ['Heartbeat avg/max jitter (us)',String(Math.round(s.heartbeat_jitter_avg_us||0))+' / '+String(s.heartbeat_jitter_max_us||0)],
+  ['k_heap',Math.round((s.heap||0)/1024)+' KB']]
    .map(r=>'<span>'+t(r[0])+'</span><b>'+r[1]+'</b>').join('');
 }
 function draw(){

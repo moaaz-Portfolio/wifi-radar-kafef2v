@@ -1,0 +1,16 @@
+{
+  "name": "WiFi Radar Analyzer RX",
+  "version": "2.0.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        {
+          "path": "firmware/analyzer_rx_merged.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}

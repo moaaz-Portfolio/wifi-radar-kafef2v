@@ -48,6 +48,12 @@ void settings_defaults(settings_t *o)
     o->stream_port = 5005;
     o->source = 0;
 
+    o->dedicated_mode = true;
+    o->wifi_channel = 1;
+    o->csi_ema_alpha = 0.20f;
+    o->csi_jump_threshold = 32;
+    o->csi_deadband = 0.5f;
+
     o->led_type = 1;         /* DevKitC-1 has a WS2812 on GPIO48 */
     o->led_gpio = 48;
     o->led_brightness = 40;
@@ -76,6 +82,11 @@ cJSON *settings_to_json(const settings_t *c, bool secrets)
     cJSON *o = cJSON_CreateObject();
     cJSON_AddStringToObject(o, "wifi_ssid", c->wifi_ssid);
     cJSON_AddStringToObject(o, "hostname", c->hostname);
+    cJSON_AddBoolToObject(o, "dedicated_mode", c->dedicated_mode);
+    cJSON_AddNumberToObject(o, "wifi_channel", c->wifi_channel);
+    cJSON_AddNumberToObject(o, "csi_ema_alpha", round4(c->csi_ema_alpha));
+    cJSON_AddNumberToObject(o, "csi_jump_threshold", c->csi_jump_threshold);
+    cJSON_AddNumberToObject(o, "csi_deadband", round4(c->csi_deadband));
     cJSON_AddNumberToObject(o, "role", c->role);
     cJSON_AddStringToObject(o, "stream_host", c->stream_host);
     cJSON_AddNumberToObject(o, "stream_port", c->stream_port);
@@ -173,6 +184,18 @@ void settings_apply_json(settings_t *c, const cJSON *j, bool trusted)
     }
 
     if (get_str(j, "hostname", c->hostname, sizeof(c->hostname))) sanitize_host(c->hostname);
+
+    c->dedicated_mode = getb(item(j, "dedicated_mode"), c->dedicated_mode);
+    const int requested_channel = clampi(item(j, "wifi_channel"), 1, 13, c->wifi_channel);
+    /* Keep to the selected common channel plan (TX uses the matching Kconfig choice). */
+    if (requested_channel == 1 || requested_channel == 6 || requested_channel == 11) {
+        c->wifi_channel = (uint8_t)requested_channel;
+    }
+    c->csi_ema_alpha = clampf(item(j, "csi_ema_alpha"), 0.01f, 1.0f, c->csi_ema_alpha);
+    c->csi_jump_threshold = (uint8_t)clampi(
+        item(j, "csi_jump_threshold"), 0, 127, c->csi_jump_threshold);
+    c->csi_deadband = clampf(item(j, "csi_deadband"), 0.0f, 2.0f,
+                             c->csi_deadband);
 
     c->role = (uint8_t)clampi(item(j, "role"), 0, 2, c->role);
     if (get_str(j, "stream_host", tmp, sizeof(c->stream_host))) {

@@ -1,0 +1,16 @@
+{
+  "name": "WiFi Radar Transmitter TX",
+  "version": "2.0.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        {
+          "path": "firmware/transmitter_tx_merged.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,58 +1,86 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ESP32-S3 WiFi Radar — Install</title>
-<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
-<style>
-:root{--bg:#f1f5f9;--card:#ffffff;--line:#d8e1ec;--tx:#14213d;--mut:#64748b;--ac:#2563eb}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.7 system-ui,Segoe UI,Tahoma,Arial,sans-serif;padding:32px 18px}
-.w{max-width:680px;margin:0 auto;text-align:center}
-h1{font-size:40px;margin:0}
-.sub{color:var(--ac);font-weight:700;margin:6px 0 18px}
-p{color:var(--mut)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px;margin-top:26px}
-.steps{text-align:start;margin-top:30px}
-.s{display:flex;gap:14px;margin:12px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#f8fafc}
-.n{min-width:32px;height:32px;border-radius:50%;background:var(--ac);color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:800}
-.s b{display:block}.s span{color:var(--mut);font-size:14px}
-code{color:var(--ac)}
-.lang{background:transparent;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:6px 14px;cursor:pointer}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>WiFi Radar — Firmware Installer</title>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1220;--card:#121e31;--line:#263850;--text:#edf4ff;--muted:#a8b8cc;--blue:#4ea1ff;--gold:#e8c477}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(900px 480px at 50% -180px,#203657 0%,var(--bg) 70%);color:var(--text);font:16px/1.75 system-ui,"Segoe UI",Tahoma,Arial,sans-serif;padding:28px 16px}
+    .wrap{max-width:880px;margin:auto}
+    header{text-align:center;padding:16px 10px 24px}
+    h1{font-size:clamp(30px,6vw,46px);margin:0;font-weight:800;letter-spacing:.2px}
+    .sub{color:var(--muted);margin:8px auto 0;max-width:680px}
+    .pill{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:3px 12px;color:var(--gold);font-size:12px;margin-bottom:12px}
+    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 22px}
+    .step{border:1px solid var(--line);background:#101a2b;border-radius:14px;padding:12px;color:var(--muted);font-size:13px}
+    .step b{display:block;color:var(--text);font-size:14px;margin-bottom:4px}
+    .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .card{background:linear-gradient(180deg,#15243a,var(--card));border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 18px 40px #0003}
+    .tag{font-size:12px;color:var(--blue);font-weight:800;letter-spacing:.04em}
+    h2{margin:5px 0 8px;font-size:21px}
+    p{color:var(--muted);margin:6px 0 14px;font-size:14px}
+    .install{display:flex;justify-content:center;padding:12px 0 3px}
+    esp-web-install-button{display:inline-block;--esp-tools-button-color:var(--blue);--esp-tools-button-text-color:#061323;--esp-tools-button-border-radius:12px;--esp-tools-button-padding:13px 22px}
+    .note{border:1px solid #66552e;background:#2b2518;border-radius:13px;padding:13px 15px;color:#f1dba6;font-size:13px;margin-top:16px}
+    code{background:#0b1423;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#d5e9ff;direction:ltr;display:inline-block}
+    footer{text-align:center;color:#7f91a8;font-size:12px;margin:20px 0 0}
+    @media(max-width:650px){.cards{grid-template-columns:1fr}.steps{grid-template-columns:1fr}}
+  </style>
 </head>
 <body>
-<div class="w">
- <button class="lang" id="lg">EN</button>
- <h1>WiFi Radar</h1>
- <div class="sub">ESP32-S3</div>
- <p data-i="d"></p>
- <div class="card">
-  <h2 data-i="h"></h2>
-  <p data-i="p"></p>
-  <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
-  <p style="font-size:12px" data-i="req"></p>
- </div>
- <div class="steps">
-  <div class="s"><div class="n">1</div><div><b data-i="s1"></b><span data-i="s1d"></span></div></div>
-  <div class="s"><div class="n">2</div><div><b data-i="s2"></b><span data-i="s2d"></span></div></div>
-  <div class="s"><div class="n">3</div><div><b data-i="s3"></b><span data-i="s3d"></span></div></div>
-  <div class="s"><div class="n">4</div><div><b data-i="s4"></b><span data-i="s4d"></span></div></div>
- </div>
-</div>
-<script>
-const D={
-ar:{d:"حوّل ESP32-S3 لحساس حركة بالواي فاي من غير كاميرا ولا حساسات إضافية.",h:"تنصيب الفيرموير",p:"وصّل اللوحة بالـ USB واضغط الزرار.",req:"محتاج Chrome أو Edge على كمبيوتر.",
- s1:"اتصل بشبكة S3-Radar-Setup",s1d:"اللوحة بتعمل شبكة مؤقتة بعد التنصيب.",s2:"اختار شبكتك واكتب الباسورد",s2d:"صفحة الإعداد بتفتح لوحدها وفيها قائمة بالشبكات.",
- s3:"افتح لوحة التحكم",s3d:"من أي جهاز على نفس الشبكة افتح الرابط اللي ظهر لك (مثلاً s3radar-xxxxxx.local).",s4:"اضبط واستمتع",s4d:"حساسية، ألوان، MQTT، Home Assistant، ريلاي، وكل ده من الصفحة."},
-en:{d:"Turn an ESP32-S3 into a Wi-Fi motion sensor. No camera, no extra sensors.",h:"Install firmware",p:"Plug the board in with USB and press the button.",req:"Requires Chrome or Edge on desktop.",
- s1:"Join the S3-Radar-Setup network",s1d:"The board opens a temporary Wi-Fi network after install.",s2:"Pick your Wi-Fi and enter the password",s2d:"The setup page opens by itself and lists nearby networks.",
- s3:"Open the dashboard",s3d:"From any device on your network open the address shown (e.g. s3radar-xxxxxx.local).",s4:"Tune it",s4d:"Sensitivity, colours, MQTT, Home Assistant, relay — all from the page."}};
-let l=localStorage.getItem('lang')||'ar';
-function ap(){document.documentElement.lang=l;document.documentElement.dir=l=='ar'?'rtl':'ltr';
- document.querySelectorAll('[data-i]').forEach(e=>e.textContent=D[l][e.dataset.i]);document.getElementById('lg').textContent=l=='ar'?'EN':'عربي'}
-document.getElementById('lg').onclick=()=>{l=l=='ar'?'en':'ar';localStorage.setItem('lang',l);ap()};ap();
-</script>
+  <main class="wrap">
+    <header>
+      <div class="pill">ESP32-S3 · ESP Web Tools · Firmware 2.x</div>
+      <h1>WiFi Radar</h1>
+      <p class="sub">مثبّت الشريحتين لبنية TX/RX مستقلة عن الراوتر. استخدم Chrome أو Edge على كمبيوتر، ووصل شريحة واحدة فقط عبر USB في كل مرة.</p>
+    </header>
+
+    <section class="steps" aria-label="خطوات التثبيت">
+      <div class="step"><b>1 — المرسل TX أولًا</b>احرق شريحة الإرسال الجديدة، ثم شغّلها وانتظر ظهور الشبكة.</div>
+      <div class="step"><b>2 — المحلل RX ثانيًا</b>احرق الشريحة القديمة بفيرموير Analyzer RX.</div>
+      <div class="step"><b>3 — اللابتوب</b>اتصل بشبكة WiFi-Radar-Net ثم شغّل تطبيق Python عليها.</div>
+    </section>
+
+    <section class="cards">
+      <article class="card">
+        <div class="tag">TRANSMITTER · TX NODE</div>
+        <h2>حرق الشريحة المرسلة (Transmitter TX - الشريحة الجديدة)</h2>
+        <p>تنشئ نقطة اتصال WiFi-Radar-Net وتبث heartbeat على UDP/3333 بمعدل مستهدف 100Hz. كلمة مرور الشبكة 12345678.</p>
+        <div class="install">
+          <esp-web-install-button manifest="manifest_tx.json">
+            <span slot="unsupported">المتصفح لا يدعم Web Serial. استخدم Chrome أو Edge على الكمبيوتر.</span>
+            <span slot="not-allowed">افتح الصفحة عبر HTTPS واسمح بالوصول إلى USB.</span>
+          </esp-web-install-button>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="tag">ANALYZER · RX NODE</div>
+        <h2>حرق الشريحة المحللة (Analyzer RX - الشريحة القديمة)</h2>
+        <p>تتصل تلقائيًا بنقطة TX، تلتقط CSI من BSSID الخاص بها، ثم ترسل حزم CSI1 ذات 64 قيمة إلى UDP/5005، مع استمرار حساس الباب على UDP/5006.</p>
+        <div class="install">
+          <esp-web-install-button manifest="manifest_rx.json">
+            <span slot="unsupported">المتصفح لا يدعم Web Serial. استخدم Chrome أو Edge على الكمبيوتر.</span>
+            <span slot="not-allowed">افتح الصفحة عبر HTTPS واسمح بالوصول إلى USB.</span>
+          </esp-web-install-button>
+        </div>
+      </article>
+    </section>
+
+    <div class="note">
+      <strong>تنبيه RF:</strong>
+      يستخدم الإصدار قناة 1 وعرض HT20 بدل القناة 14؛ القناة 14 يابانية ومخصصة عمليًا لـ 802.11b، ولا تتوافق مع معدل HT MCS0-SGI المطلوب. لا تغيّر بلد التشغيل إلى JP لتجاوز اللوائح المحلية. كما أن 100Hz معدل جدولة مستهدف وليس ضمانًا لصفر jitter لاسلكي.
+    </div>
+
+    <div class="note">
+      بعد الحرق: شغّل TX أولًا. اتصل من اللابتوب بشبكة <code>WiFi-Radar-Net</code> وكلمة المرور <code>12345678</code>. شغّل RX؛ العنوان المحلي الافتراضي لنقطة TX هو <code>192.168.4.1</code>. لا توصل الشريحتين بالكمبيوتر في الوقت نفسه أثناء الحرق.
+    </div>
+
+    <footer>WiFi Radar research prototype · لا تعتمد على تقديرات التواجد أو السقوط كوسيلة أمان أو إنقاذ.</footer>
+  </main>
 </body>
 </html>
