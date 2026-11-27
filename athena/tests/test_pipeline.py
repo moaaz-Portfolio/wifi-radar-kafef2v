@@ -106,6 +106,9 @@ def test_edition_guards():
 
             factory = app.State(5005, edition="factory")
             factory.rx.connected = lambda: True
+            message = factory.start_record("movement", "P1", "R1", 20)
+            assert "عاير الغرفة" in message
+            factory.presence.baseline = np.zeros(64, dtype=np.float32)
             message = factory.start_record("running", "P1", "R1", 20)
             assert "الأربع" in message
             print("Factory/User guards ok")
