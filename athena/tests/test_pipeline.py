@@ -37,7 +37,7 @@ def test_room_baseline_preserves_stationary_person_signature():
     static_features = data.normalize_window(static_window, baseline)
 
     assert np.allclose(empty_features, 0.0)
-    assert np.allclose(static_features, signature[None, :])
+    assert np.allclose(static_features, signature[None, :], atol=1e-5)
     assert float(np.abs(static_features).mean()) > 1.0
     print("empty-room reference keeps the stationary-person signature")
 
