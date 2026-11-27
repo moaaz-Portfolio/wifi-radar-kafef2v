@@ -1,6 +1,13 @@
-This folder is filled automatically by .github/workflows/bulid.yml.
-radar-s3-merged.bin        -> first installation using the ESP Web Tools page on GitHub Pages (offset 0)
-esp32s3-wifi-radar.bin     -> OTA updates from the ESP32-S3 device dashboard
+This folder is populated by .github/workflows/bulid.yml.
 
-The HC-SR04 door sensor and active buzzer use GPIO4/GPIO5/GPIO6.
-See docs/HARDWARE_HC-SR04_BUZZER_AR.md for safe wiring.
+analyzer_rx_merged.bin      -> complete first-install image for the Analyzer RX ESP32-S3 (offset 0)
+transmitter_tx_merged.bin   -> complete first-install image for the Transmitter TX ESP32-S3 (offset 0)
+esp32s3-wifi-radar.bin      -> Analyzer RX application image for OTA updates
+radar-s3-merged.bin         -> compatibility copy of analyzer_rx_merged.bin
+
+Both merged images include:
+- bootloader at 0x0000
+- partition table at 0xA000
+- application at 0x20000
+
+Install TX first, then RX. The laptop joins WiFi-Radar-Net (password 12345678).

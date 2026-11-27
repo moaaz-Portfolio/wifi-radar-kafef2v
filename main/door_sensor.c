@@ -83,8 +83,10 @@ static void publish_udp(int sock, uint32_t sequence, const door_sensor_snapshot_
     struct sockaddr_in dest = {0};
     dest.sin_family = AF_INET;
     dest.sin_port = htons(telemetry_port);
-    if (cfg->stream_host[0] == 0 ||
-        inet_pton(AF_INET, cfg->stream_host, &dest.sin_addr) != 1) {
+    if (cfg->dedicated_mode) {
+        dest.sin_addr.s_addr = inet_addr("192.168.4.255");
+    } else if (cfg->stream_host[0] == 0 ||
+               inet_pton(AF_INET, cfg->stream_host, &dest.sin_addr) != 1) {
         dest.sin_addr.s_addr = htonl(INADDR_BROADCAST);
     }
 

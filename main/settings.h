@@ -9,6 +9,12 @@ typedef struct {
     char wifi_ssid[33];
     char wifi_pass[65];
     char hostname[32];
+    /* Dedicated two-node RF link (default on); BOOT toggles this mode. */
+    bool dedicated_mode;
+    uint8_t wifi_channel;          /* expected TX channel: 1, 6 or 11 */
+    float csi_ema_alpha;           /* 0.01 .. 1.00 */
+    uint8_t csi_jump_threshold;    /* raw amplitude delta; 0 disables spike rejection */
+    float csi_deadband;            /* 0..2 amplitude units; default 0.5 */
     /* Mode */
     uint8_t role;            /* 0 = sensor, 1 = sender (helper board), 2 = CSI streamer (for ML tools) */
     char stream_host[40];    /* PC address for role 2, "" = broadcast */
