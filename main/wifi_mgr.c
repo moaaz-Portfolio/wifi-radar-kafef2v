@@ -246,6 +246,8 @@ netmode_t wifi_mgr_start(void)
 
     set_egypt_country_profile();
 
+    /* Configure STA mode before applying STA-only protocol settings. */
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(
         WIFI_IF_STA,
         WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N));
@@ -282,7 +284,6 @@ netmode_t wifi_mgr_start(void)
     outputs_set_net_state(OUT_NET_CONNECTING);
     s_try = true;
     s_mode = NETMODE_STA;
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta));
     ESP_ERROR_CHECK(esp_wifi_start());
     s_started = true;
