@@ -159,10 +159,10 @@ class State:
         except (FileNotFoundError, ValueError, KeyError, TypeError):
             pass
 
-    def _adapt_model_to_room(self, ts, amp):
+    def _adapt_model_to_room(self, ts, amp, room_baseline):
         if not self.predictor:
             return None
-        info = self.predictor.adapt_room(ts, amp)
+        info = self.predictor.adapt_room(ts, amp, room_baseline=room_baseline)
         if info.get("adapted"):
             tmp = self.ROOM_GAIN_PATH + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
@@ -200,7 +200,9 @@ class State:
             if self.predictor:
                 try:
                     p_ts, p_amp = self.rx.recent(self.predictor.seconds_needed + 0.5)
-                    self.pred = self.predictor.predict(p_ts, p_amp)
+                    self.pred = self.predictor.predict(
+                        p_ts, p_amp, room_baseline=self.presence.baseline
+                    )
                 except Exception as e:
                     self.model_error = str(e)
             fall_state = self.fall_detector.update(
@@ -261,7 +263,7 @@ class State:
                     raise ValueError("جلسة المعايرة لم تغطِّ المدة المطلوبة؛ أعد المحاولة مع بث مستمر.")
             result = self.presence.calibrate(ts, amp)
             try:
-                self._adapt_model_to_room(ts, amp)          # never lets a model problem fail the Room Profile
+                self._adapt_model_to_room(ts, amp, self.presence.baseline)  # model adaptation is optional
             except Exception as exc:
                 self.model_error = f"room adaptation skipped: {exc}"
             self.calibration.update(status="done", left=0,
@@ -277,6 +279,8 @@ class State:
             return "تسجيل البيانات متاح في Factory Edition فقط"
         if self.calibration["status"] == "running":
             return "استنى لحد ما المعايرة تخلص"
+        if not self.presence.calibrated:
+            return "عاير الغرفة وهي فارغة أولًا قبل تسجيل الحالات."
         if self.rec["status"] not in ("idle", "done", "error"):
             return "already recording"
         if not self.rx.connected():
@@ -284,11 +288,14 @@ class State:
         label = data.safe_name(label)
         if label not in data.ACTIVITY_LABELS:
             return "اختار واحدة من الحالات الأربع المعتمدة فقط"
+        room_baseline = self.presence.baseline.copy()
         self._rec_stop.clear()
-        threading.Thread(target=self._record, args=(label, person, room, seconds), daemon=True).start()
+        threading.Thread(
+            target=self._record, args=(label, person, room, seconds, room_baseline), daemon=True
+        ).start()
         return ""
 
-    def _record(self, label, person, room, seconds):
+    def _record(self, label, person, room, seconds, room_baseline):
         r = self.rec
         r.update(status="countdown", label=label, msg="", frames=0, left=3)
         for i in (3, 2, 1):
@@ -312,7 +319,7 @@ class State:
             r.update(status="error", msg="too few frames received - move the board closer to the router")
             return
         ts, rssi, amp = res
-        data.save_take(DATA_DIR, label, person, room, ts, rssi, amp)
+        data.save_take(DATA_DIR, label, person, room, ts, rssi, amp, room_baseline)
         rate = len(ts) / max(seconds, 1)
         r.update(status="done", msg=f"saved {len(ts)} frames ({rate:.0f}/s)", frames=len(ts))
 

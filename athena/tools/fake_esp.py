@@ -23,7 +23,11 @@ def frame(t, label, base, rng):
     frequency, amplitude = ACTIVITIES[label]
     phase = np.linspace(0, 3, 64)
     motion = amplitude * np.sin(2 * np.pi * frequency * t + phase) if frequency else 0.0
-    return np.clip(base + motion + rng.normal(0, 0.8, 64), 0, 255)
+    # A stationary person changes the channel profile persistently, even with
+    # almost no temporal movement. The empty-room baseline must retain this cue.
+    presence_signature = (3.5 * np.sin(phase * 1.7 + 0.4)
+                          if label != "empty_room" else 0.0)
+    return np.clip(base + presence_signature + motion + rng.normal(0, 0.8, 64), 0, 255)
 
 
 def main():

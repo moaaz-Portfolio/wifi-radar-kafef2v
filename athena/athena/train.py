@@ -1,9 +1,12 @@
 """Train on your own recordings (v2: deep model, EMA weights, calibration, novelty detection)."""
 import copy
+import hashlib
+import io
 import math
 import os
 import random
 import time
+import uuid
 
 import numpy as np
 
@@ -240,8 +243,11 @@ def train(root, out_dir, epochs=30, fs=50, win=64, hop=16,
     }
     ci = L.block_bootstrap_ci(yte, te_pred, gte, n_cls) if gte is not None else None
 
+    model_id = uuid.uuid4().hex
+    preprocessing = "room_baseline_v1" if normalize else "raw_amplitude_v1"
     ckpt = {
-        "version": model_version, "arch": arch,
+        "version": model_version, "model_id": model_id,
+        "preprocessing": preprocessing, "arch": arch,
         "state_dict": {k: v.cpu() for k, v in ema.state_dict().items()},
         "labels": labels, "feature_count": FEATURES, "window_length": win,
         "fs": fs, "scale": scale, "confidence_threshold": float(threshold), "normalize": normalize,
@@ -250,8 +256,15 @@ def train(root, out_dir, epochs=30, fs=50, win=64, hop=16,
         "empty_noise_floor": float(empty_floor), "seed": seed,
     }
 
+    checkpoint_buffer = io.BytesIO()
+    torch.save(ckpt, checkpoint_buffer)
+    model_bytes = checkpoint_buffer.getvalue()
+    model_sha256 = hashlib.sha256(model_bytes).hexdigest()
+
     metrics = {
-        "model_version": ckpt["version"], "arch": arch, "normalize": normalize, "labels": labels, "fs": fs,
+        "model_version": ckpt["version"], "model_id": model_id,
+        "model_sha256": model_sha256, "preprocessing": preprocessing,
+        "arch": arch, "normalize": normalize, "labels": labels, "fs": fs,
         "window_length": win, "seed": seed,
         "recordings": counts, "windows": {"train": len(Xtr), "val": len(Xva), "test": len(Xte)},
         "best_val_macro_f1": best_key[0],
@@ -274,9 +287,14 @@ def train(root, out_dir, epochs=30, fs=50, win=64, hop=16,
     if save:
         os.makedirs(out_dir, exist_ok=True)
         path = os.path.join(out_dir, model_filename)
-        torch.save(ckpt, path)
+        temporary_path = path + ".tmp"
+        with open(temporary_path, "wb") as stream:
+            stream.write(model_bytes)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_path, path)
         write_json(os.path.join(out_dir, metrics_filename), metrics)
-        log(f"{msg}  -> saved {path}")
+        log(f"{msg}  -> saved {path} (model id {model_id})")
     else:
         log(msg)
     return metrics

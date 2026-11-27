@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "wifi-radar/**"
+      - "fix/**"
   pull_request:
   workflow_dispatch:
 
@@ -26,7 +27,9 @@ jobs:
           cache-dependency-path: athena/requirements.txt
 
       - name: Install test dependencies
-        run: python -m pip install --upgrade pip numpy pytest
+        run: |
+          python -m pip install --upgrade pip numpy pytest
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Run edition and monitoring tests
         working-directory: athena
@@ -41,3 +44,7 @@ jobs:
       - name: Run four-class cross-validation checks
         working-directory: athena
         run: python -m pytest -q tests/test_crossval.py
+
+      - name: Test trained inference and exported User Edition
+        working-directory: athena
+        run: python -m pytest -q tests/test_torch_stack.py tests/test_package_user.py

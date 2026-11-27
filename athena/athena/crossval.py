@@ -171,8 +171,8 @@ def main():
     ap.add_argument("--epochs", type=int, default=20)
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--baseline-only", action="store_true", help="no torch needed")
-    ap.add_argument("--no-normalize", action="store_true", help="keep the room signature (ablation)")
-    ap.add_argument("--ablate", action="store_true", help="run with AND without normalize_window")
+    ap.add_argument("--no-normalize", action="store_true", help="keep raw amplitudes instead of subtracting the room baseline (ablation)")
+    ap.add_argument("--ablate", action="store_true", help="run with and without empty-room baseline referencing")
     a = ap.parse_args()
 
     baseline_only = a.baseline_only

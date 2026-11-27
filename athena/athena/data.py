@@ -16,10 +16,13 @@ def safe_name(s):
     return re.sub(r"[^a-zA-Z0-9_-]+", "_", s.strip()).strip("_") or "x"
 
 
-def save_take(root, label, person, room, ts, rssi, amp):
+def save_take(root, label, person, room, ts, rssi, amp, room_baseline):
     label = safe_name(label)
     if label not in ACTIVITY_LABELS:
         raise ValueError(f"Unsupported activity label: {label}. Allowed: {', '.join(ACTIVITY_LABELS)}")
+    room_baseline = np.asarray(room_baseline, dtype=np.float32)
+    if room_baseline.shape != (FEATURES,) or not np.isfinite(room_baseline).all():
+        raise ValueError("A valid 64-feature empty-room baseline is required before recording.")
     d = os.path.join(root, label)
     os.makedirs(d, exist_ok=True)
     stem = f"{time.strftime('%Y%m%d-%H%M%S')}_{safe_name(person)}_{safe_name(room)}"
@@ -27,8 +30,8 @@ def save_take(root, label, person, room, ts, rssi, amp):
     while os.path.exists(path):
         k += 1
         path = os.path.join(d, f"{stem}-{k}.npz")
-    np.savez_compressed(path, ts=ts, rssi=rssi, amp=amp, label=label,
-                        person=person or "", room=room or "")
+    np.savez_compressed(path, ts=ts, rssi=rssi, amp=amp, room_baseline=room_baseline,
+                        label=label, person=person or "", room=room or "")
     return path
 
 
@@ -65,10 +68,17 @@ def resample(ts_ms, amp, fs):
     return out
 
 
-def normalize_window(w):
-    """Remove the static room signature (per-subcarrier mean of the window).
-    What is left is how the signal MOVES, which transfers better between rooms."""
-    return w - w.mean(axis=0, keepdims=True)
+def normalize_window(w, room_baseline):
+    """Reference each frame to a measured empty-room signal.
+
+    This removes the room's empty-state baseline without removing a stationary
+    person's persistent CSI signature from every individual window.
+    """
+    w = np.asarray(w, dtype=np.float32)
+    baseline = np.asarray(room_baseline, dtype=np.float32)
+    if w.ndim != 2 or w.shape[1] != FEATURES or baseline.shape != (FEATURES,):
+        raise ValueError("Expected a (time, 64) window and a 64-feature room baseline.")
+    return w - baseline[None, :]
 
 
 def make_windows(series, win, hop):
@@ -110,11 +120,25 @@ def build_split(files, labels, fs, win, hop, normalize=True, return_groups=False
         raise DatasetError("this split has no recordings")
     X, y, g = [], [], []
     for rec, (path, lab) in enumerate(files):
-        z = np.load(path, allow_pickle=False)
-        series = resample(z["ts"], z["amp"], fs)
+        with np.load(path, allow_pickle=False) as z:
+            if normalize:
+                if "room_baseline" not in z.files:
+                    raise DatasetError(
+                        f"Recording '{os.path.basename(path)}' has no empty-room baseline. "
+                        "Calibrate the empty room and re-record this activity before training."
+                    )
+                room_baseline = np.asarray(z["room_baseline"], dtype=np.float32)
+                if room_baseline.shape != (FEATURES,) or not np.isfinite(room_baseline).all():
+                    raise DatasetError(
+                        f"Recording '{os.path.basename(path)}' contains an invalid room baseline."
+                    )
+            else:
+                room_baseline = None
+            series = resample(z["ts"], z["amp"], fs)
         w = make_windows(series, win, hop)
         if len(w):
-            X.append(np.stack([normalize_window(x) if normalize else x for x in w]))
+            X.append(np.stack([normalize_window(x, room_baseline) for x in w])
+                     if normalize else w)
             y += [labels.index(lab)] * len(w)
             g += [rec] * len(w)
     if not X:

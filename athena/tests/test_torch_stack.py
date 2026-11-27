@@ -46,12 +46,14 @@ def test_train_save_load_predict(tmp_path):
     assert set(t["per_class"]) == set(LABELS)
     p = Predictor(os.path.join(out, "activity_model.pt"))        # weights_only load must accept the checkpoint
     assert p.arch == "v2" and p.temperature > 0
+    assert p.preprocessing == "room_baseline_v1"
     ts = np.cumsum(np.full(600, 11.0))
     amp = np.random.default_rng(0).integers(40, 80, (600, 64)).astype(np.uint8)
+    room_baseline = np.median(amp, axis=0).astype(np.float32)
     for _ in range(3):
-        r = p.predict(ts, amp)
+        r = p.predict(ts, amp, room_baseline=room_baseline)
     assert r["label"] in LABELS + ("uncertain",) and abs(sum(r["probs"].values()) - 1) < 1e-6
-    info = p.adapt_room(ts, amp)
+    info = p.adapt_room(ts, amp, room_baseline=room_baseline)
     assert 0.33 <= p.gain <= 3.0 and "adapted" in info
 
 

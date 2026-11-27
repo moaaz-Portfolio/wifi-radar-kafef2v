@@ -29,13 +29,14 @@ def make_dataset(root, takes=3, seconds=6, rate=90):
                     ts = np.cumsum(rng.uniform(8, 14, n))
                     amp = np.stack([fake_esp.frame(t / 1000.0, label, base, rng) for t in ts]).astype(np.uint8)
                     data.save_take(root, label, person, room, ts.astype(np.uint32),
-                                   np.full(n, -50, np.int8), amp)
+                                   np.full(n, -50, np.int8), amp, base)
 
 
 def test_save_take_never_overwrites(tmp_path):
     root = os.path.join(str(tmp_path), "collide")
     ts, rssi, amp = np.arange(10), np.zeros(10, np.int8), np.zeros((10, 64), np.uint8)
-    paths = {data.save_take(root, "empty_room", "p", "r", ts, rssi, amp) for _ in range(5)}
+    paths = {data.save_take(root, "empty_room", "p", "r", ts, rssi, amp,
+                            np.zeros(64, dtype=np.float32)) for _ in range(5)}
     assert len(paths) == 5 and all(os.path.exists(p) for p in paths)
     print("save_take collision-safe ok")
 
@@ -106,7 +107,8 @@ def test_needs_two_groups(tmp_path):
     amp = np.random.default_rng(0).integers(40, 80, (400, 64)).astype(np.uint8)
     for lab in ("empty_room", "movement"):
         for _ in range(3):
-            data.save_take(root, lab, "ali", "only_room", ts, rssi, amp)
+            data.save_take(root, lab, "ali", "only_room", ts, rssi, amp,
+                           np.zeros(64, dtype=np.float32))
     try:
         crossval.run(root, "room", baseline_only=True, log=lambda *_: None)
         raise SystemExit("one room must be rejected")

@@ -21,16 +21,17 @@ A package is not created if any class or independent test metrics are missing. T
 
 ## Factory to user release
 
-1. Run Factory Edition and collect new, labeled recordings.
-2. Ensure every class has enough independent recordings. Three per class is only a technical minimum; more people, rooms, sessions, and days are strongly recommended.
-3. Train and review the untouched test set.
-4. Check held-out-person and held-out-room results separately.
-5. Run the release package command from the repository root:
+1. Run Factory Edition and calibrate the room while it is empty.
+2. Collect new, labeled recordings. Each recording stores the 64-feature empty-room baseline used by preprocessing.
+3. Ensure every class has enough independent recordings. Three per class is only a technical minimum; more people, rooms, sessions, and days are strongly recommended.
+4. Train and review the untouched test set.
+5. Check held-out-person and held-out-room results separately.
+6. Run the release package command from the repository root:
 
    `python -m athena.package_user --version 1.0.0 --researcher-approved`
 
-6. Distribute `dist/WiFi-Radar-User.zip` to the target local processing device.
-7. The target device runs the same inference pipeline with the bundled model; no development laptop is required during normal use.
+7. Distribute `dist/WiFi-Radar-User.zip` to the target local processing device.
+8. The target device runs the same baseline-referenced inference pipeline with the bundled model; no development laptop is required during normal use.
 
 ## Processing hardware note
 

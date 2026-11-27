@@ -24,7 +24,7 @@ METRICS_PATH = MODEL_DIR / "metrics.json"
 REQUIRED_LABELS = {"empty_room", "person_static", "movement", "fall_detection"}
 RUNTIME_FILES = [
     "athena/__init__.py", "athena/__main__.py", "athena/app.py",
-    "athena/data.py", "athena/edition.py", "athena/live.py",
+    "athena/data.py", "athena/edition.py", "athena/learning.py", "athena/live.py",
     "athena/model.py", "athena/monitor.py", "athena/proto.py",
     "athena/receiver.py", "athena/door.py", "athena/static/index.html", "requirements.txt",
 ]
@@ -38,14 +38,15 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def validate_model() -> tuple[list[str], dict]:
-    if not MODEL_PATH.is_file():
-        raise SystemExit("No factory model found. Train a model first: " + str(MODEL_PATH))
-    if not METRICS_PATH.is_file():
+def validate_model(model_path: Path = MODEL_PATH,
+                   metrics_path: Path = METRICS_PATH) -> tuple[list[str], dict]:
+    if not model_path.is_file():
+        raise SystemExit("No factory model found. Train a model first: " + str(model_path))
+    if not metrics_path.is_file():
         raise SystemExit("Test metrics are missing. A model without evaluation metrics cannot be packaged.")
     try:
         import torch
-        checkpoint = torch.load(MODEL_PATH, map_location="cpu", weights_only=True)
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
     except Exception as exc:
         raise SystemExit(f"Could not load factory model: {exc}") from exc
     labels = [str(x).strip().lower() for x in checkpoint.get("labels", [])]
@@ -53,27 +54,43 @@ def validate_model() -> tuple[list[str], dict]:
         raise SystemExit("User release requires exactly these four classes: " +
                          ", ".join(sorted(REQUIRED_LABELS)))
     try:
-        metrics = json.loads(METRICS_PATH.read_text(encoding="utf-8"))
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
     except Exception as exc:
         raise SystemExit(f"Could not read test metrics: {exc}") from exc
     if not isinstance(metrics.get("test"), dict) or not isinstance(metrics["test"].get("per_class"), dict):
         raise SystemExit("Metrics file does not contain per-class test results.")
     if set(metrics["test"]["per_class"]) != REQUIRED_LABELS:
         raise SystemExit("Test metrics must report exactly all four approved classes.")
+
+    model_id = checkpoint.get("model_id")
+    if not model_id or metrics.get("model_id") != model_id:
+        raise SystemExit("Model and test results have different model IDs. Retrain or restore the matching metrics.json.")
+    if metrics.get("model_version") != checkpoint.get("version"):
+        raise SystemExit("Model version and test-results version do not match.")
+    if metrics.get("arch") != checkpoint.get("arch") or metrics.get("labels") != labels:
+        raise SystemExit("Model architecture/classes do not match the saved test results.")
+    if metrics.get("preprocessing") != checkpoint.get("preprocessing"):
+        raise SystemExit("Model preprocessing and test-results preprocessing do not match.")
+    if metrics.get("model_sha256") != sha256(model_path):
+        raise SystemExit("Test results do not belong to this exact model file (SHA-256 mismatch).")
+
     # Do not certify model quality automatically: packaging is allowed only after
-    # a researcher has reviewed the results and consciously approved release.
+    # a researcher has reviewed the independent results and consciously approved release.
     return labels, metrics
 
 
-def build(version: str, output: Path, researcher_approved: bool) -> Path:
+def build(version: str, output: Path, researcher_approved: bool, app_dir: Path = APP) -> Path:
     if not researcher_approved:
         raise SystemExit("Review the independent test results first, then add --researcher-approved.")
-    labels, metrics = validate_model()
+    model_dir = app_dir / "models"
+    model_path = model_dir / "activity_model.pt"
+    metrics_path = model_dir / "metrics.json"
+    labels, metrics = validate_model(model_path, metrics_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="wifi-radar-user-") as temp:
         stage = Path(temp) / "WiFi-Radar-User"
         for relative in RUNTIME_FILES:
-            source = APP / relative
+            source = app_dir / relative
             if not source.is_file():
                 raise SystemExit(f"Required runtime file is missing: {source}")
             destination = stage / relative
@@ -81,13 +98,14 @@ def build(version: str, output: Path, researcher_approved: bool) -> Path:
             shutil.copy2(source, destination)
         (stage / "models").mkdir(parents=True, exist_ok=True)
         user_model = stage / "models" / "activity_model.pt"
-        shutil.copy2(MODEL_PATH, user_model)
-        shutil.copy2(METRICS_PATH, stage / "models" / "metrics.json")
+        shutil.copy2(model_path, user_model)
+        shutil.copy2(metrics_path, stage / "models" / "metrics.json")
         manifest = {
             "product": "WiFi Radar",
             "edition": "user",
             "version": version,
             "model_file": "models/activity_model.pt",
+            "model_id": metrics["model_id"],
             "model_sha256": sha256(user_model),
             "labels": labels,
             "test_metrics": metrics.get("test"),

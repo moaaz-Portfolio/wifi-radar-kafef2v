@@ -27,6 +27,21 @@ def test_door_packet():
     print("HC-SR04 telemetry packet ok")
 
 
+def test_room_baseline_preserves_stationary_person_signature():
+    baseline = np.linspace(40, 90, 64, dtype=np.float32)
+    signature = 4.0 * np.sin(np.linspace(0, 3, 64) * 1.7 + 0.4)
+    empty_window = np.tile(baseline, (64, 1))
+    static_window = empty_window + signature[None, :]
+
+    empty_features = data.normalize_window(empty_window, baseline)
+    static_features = data.normalize_window(static_window, baseline)
+
+    assert np.allclose(empty_features, 0.0)
+    assert np.allclose(static_features, signature[None, :])
+    assert float(np.abs(static_features).mean()) > 1.0
+    print("empty-room reference keeps the stationary-person signature")
+
+
 def test_four_class_dataset():
     assert data.ACTIVITY_LABELS == ("empty_room", "person_static", "movement", "fall_detection")
     with tempfile.TemporaryDirectory() as root:
@@ -40,7 +55,7 @@ def test_four_class_dataset():
                 ]).clip(0, 255).astype(np.uint8)
                 data.save_take(
                     root, label, f"person_{take}", f"room_{take}",
-                    ts, np.full(len(ts), -50, dtype=np.int8), amp,
+                    ts, np.full(len(ts), -50, dtype=np.int8), amp, base,
                 )
 
         takes = data.list_takes(root)
@@ -58,7 +73,7 @@ def test_four_class_dataset():
             data.save_take(
                 root, "walking", "P1", "R1", ts,
                 np.full(len(ts), -50, dtype=np.int8),
-                np.zeros((len(ts), 64), dtype=np.uint8),
+                np.zeros((len(ts), 64), dtype=np.uint8), base,
             )
             raise AssertionError("extra labels must be rejected")
         except ValueError:
@@ -101,6 +116,7 @@ def test_edition_guards():
 
 if __name__ == "__main__":
     test_door_packet()
+    test_room_baseline_preserves_stationary_person_signature()
     test_four_class_dataset()
     test_edition_guards()
     print("ALL FOUR-CLASS PIPELINE TESTS PASSED")

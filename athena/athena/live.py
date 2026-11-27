@@ -20,7 +20,14 @@ class Predictor:
         self.threshold = float(ck.get("confidence_threshold", 0.65))
         self.version = ck.get("version", "?")
         self.arch = ck.get("arch", "v1")                   # checkpoints from before v2 have no 'arch'
-        self.normalize = bool(ck.get("normalize", True))   # older checkpoints always normalised
+        self.normalize = bool(ck.get("normalize", True))
+        self.preprocessing = ck.get(
+            "preprocessing",
+            "legacy_window_center_v0" if self.normalize else "raw_amplitude_v0",
+        )
+        if self.preprocessing not in ("room_baseline_v1", "legacy_window_center_v0",
+                                      "raw_amplitude_v0", "raw_amplitude_v1"):
+            raise ValueError(f"unsupported model preprocessing: {self.preprocessing}")
         self.temperature = float(ck.get("temperature", 1.0))
         self.novelty = L.NoveltyDetector.from_dict(ck.get("novelty")) if self.arch != "v1" else L.NoveltyDetector()
         self.adapter = L.RoomAdapter(float(ck.get("empty_noise_floor", 0.0)))
@@ -47,26 +54,40 @@ class Predictor:
         self._decider.reset()
         self._novel_hist.clear()
 
-    def adapt_room(self, ts, amp):
-        """Label-free adaptation from an EMPTY-room recording (the Room Profile). Aligns this room's
-        noise floor with the one the model was trained on. Returns what it did, so the UI can show it."""
+    def _preprocess_windows(self, windows, room_baseline=None):
+        if self.preprocessing == "room_baseline_v1":
+            if room_baseline is None:
+                return None
+            return np.stack([normalize_window(w, room_baseline) for w in windows])
+        if self.preprocessing == "legacy_window_center_v0":
+            return np.stack([w - w.mean(axis=0, keepdims=True) for w in windows])
+        return windows
+
+    def adapt_room(self, ts, amp, room_baseline=None):
+        """Adapt the model using empty-room samples referenced to that room's saved baseline."""
         series = resample(ts, amp, self.fs)
         wins = make_windows(series, self.win, max(self.win // 4, 1))
         if len(wins) < 5 or self.adapter.train_floor <= 0:
             return {"adapted": False, "gain": self.gain,
                     "reason": "not enough empty-room data or the model stores no noise floor"}
-        wins = np.stack([normalize_window(w) for w in wins])
+        wins = self._preprocess_windows(wins, room_baseline)
+        if wins is None:
+            return {"adapted": False, "gain": self.gain,
+                    "reason": "empty-room calibration is required for this model"}
         floor = L.window_noise_floor(wins)
         self.set_gain(self.adapter.gain(floor))
         return {"adapted": True, "gain": self.gain, "room_floor": floor,
                 "train_floor": self.adapter.train_floor}
 
-    def predict(self, ts, amp):
+    def predict(self, ts, amp, room_baseline=None):
         series = resample(ts, amp, self.fs)
         if len(series) < self.win:
             return None
         w = series[-self.win:]
-        x = (normalize_window(w) if self.normalize else w) * self.gain / self.scale
+        processed = self._preprocess_windows(w[None, :, :], room_baseline)
+        if processed is None:
+            return None
+        x = processed[0] * self.gain / self.scale
         with self.torch.no_grad():
             logits, emb = self.model.features(self.torch.from_numpy(x[None]).float())
         probs = L.softmax(logits[0].numpy().astype(np.float64) / self.temperature)
